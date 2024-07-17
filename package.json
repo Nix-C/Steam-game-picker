@@ -1,0 +1,24 @@
+{
+  "name": "steam-game-picker",
+  "version": "1.0.0",
+  "description": "Helps discord users pick games to play with their friends!",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [
+    "discord"
+  ],
+  "author": "Nathaniel Campbell (Nix-C)",
+  "license": "ISC",
+  "dependencies": {
+    "discord-interactions": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
