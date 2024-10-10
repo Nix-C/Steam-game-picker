@@ -1,7 +1,0 @@
-Running is a two-step process. 
-
-1. Run `ngrok http --domain=loving-casual-minnow.ngrok-free.app 3000`
-2. Run `npm run dev`
-
-Reading Progress
-We left off here: https://discord.com/developers/docs/quick-start/getting-started#step-4-adding-message-components
