@@ -20,8 +20,20 @@
  * - Interaction Tokens are valid for 15 minutes. Delete after 15 minutes.
  */
 
+/**
+ * Navigating the user back to discord using the `discord://` protocol
+ *
+ * Unofficial documentation:
+ * https://gist.github.com/ghostrider-05/8f1a0bfc27c7c4509b4ea4e8ce718af0
+ */
+
 import "dotenv/config";
 import express from "express";
+import url from "node:url";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+import axios from "axios";
 import {
   InteractionType,
   InteractionResponseType,
@@ -37,15 +49,30 @@ const app = express();
 // Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Include my public pages
+app.use(express.static(path.join(__dirname, "public")));
+
 // Store for in-progress searches. In production, you'd want to use a DB
 const activeInteractions = {};
 const maxLobbySize = 3;
+
+/**
+ * Steam ID 'DB'
+ *
+ * {
+ *    userId: discord_id,
+ *    steamId: steam_id
+ * }
+ */
+const userData = {};
 
 function ephemeralBasic(text) {
   return {
     type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
     data: {
-      // Fetches a random emoji to send from a helper function
       content: text,
       flags: InteractionResponseFlags.EPHEMERAL,
     },
@@ -71,6 +98,28 @@ async function updateOriginalInteraction(req, partyData) {
   }
 }
 
+const RequestSteamId = {
+  type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+  data: {
+    content:
+      "This bot wants to access your Steam connection. \nNOTE: Make sure you've connected your Steam account to Discord first!",
+    flags: InteractionResponseFlags.EPHEMERAL,
+    components: [
+      {
+        type: MessageComponentTypes.ACTION_ROW,
+        components: [
+          {
+            type: MessageComponentTypes.BUTTON,
+            label: "Allow Access",
+            style: ButtonStyleTypes.LINK,
+            url: "https://discord.com/oauth2/authorize?client_id=1268350054863998998&response_type=code&redirect_uri=https%3A%2F%2Floving-casual-minnow.ngrok-free.app%2Fapi%2Fauth%2Fdiscord%2Fredirect&scope=identify+connections",
+          },
+        ],
+      },
+    ],
+  },
+};
+
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
  * Parse request body and verifies incoming requests using discord-interactions package
@@ -93,9 +142,18 @@ app.post(
      * Handle slash command requests
      * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
      */
-    if (type === InteractionType.APPLICATION_COMMAND) {
-      const { name } = data;
 
+    if (type === InteractionType.APPLICATION_COMMAND) {
+      // Require user permission
+      if (!userData[user.id]) {
+        await res.send(RequestSteamId);
+        return;
+      }
+
+      const { name } = data;
+      if (name === "test") {
+        await res.send(RequestSteamId);
+      }
       if (name === "game-picker" && id) {
         // Init session in "db"
         activeInteractions[id] = {
@@ -173,6 +231,11 @@ app.post(
       const { custom_id } = req.body.data;
       const [name, _, interactionId] = custom_id.split("_");
       const partyData = activeInteractions?.[interactionId];
+
+      if (!userData[user.id]) {
+        await res.send(RequestSteamId);
+        return;
+      }
 
       if (partyData) {
         // Handle join/leave
@@ -332,6 +395,75 @@ app.post(
     return res.status(400).json({ error: "unknown interaction type" });
   }
 );
+
+// OAuth2 redirect
+app.get("/api/auth/discord/redirect", async (req, res) => {
+  const { code } = req.query;
+  if (code) {
+    const formdata = new url.URLSearchParams({
+      client_id: process.env.CLIENT_ID,
+      client_secret: process.env.CLIENT_SECRET,
+      grant_type: "authorization_code",
+      code: code.toString(),
+      redirect_uri: `https://loving-casual-minnow.ngrok-free.app/api/auth/discord/redirect`,
+    });
+
+    // Get access token
+    const output = await axios
+      .post("https://discord.com/api/oauth2/token", formdata, {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      })
+      .catch(function (error) {
+        console.error(error, "An error occurred sending data");
+      });
+
+    // If access_token retrieved
+    if (output.data?.access_token) {
+      const access = output.data.access_token;
+
+      // Request user discord identity
+      const identity_res = await axios
+        .get(`https://discord.com/api/users/@me`, {
+          headers: {
+            Authorization: `Bearer ${access}`,
+          },
+        })
+        .catch(function (error) {
+          console.error(error);
+        });
+
+      const discordId = identity_res.data.id;
+      console.log("Discord ID", discordId);
+
+      // Request user connections
+      const connections_res = await axios
+        .get(`https://discord.com/api/users/@me/connections`, {
+          headers: {
+            Authorization: `Bearer ${access}`,
+          },
+        })
+        .catch(function (error) {
+          console.error(error);
+        });
+      const steamConnection = connections_res.data?.find(
+        (connection) => connection.type === "steam"
+      );
+
+      console.log("Steam ID:", steamConnection.id);
+      if (steamConnection.id && discordId) {
+        userData[discordId] = steamConnection.id;
+        console.log(userData);
+        res.status(200).redirect("/success.html");
+      }
+
+      return;
+    }
+  }
+
+  return;
+});
 
 app.listen(PORT, () => {
   console.log("Listening on port", PORT);
