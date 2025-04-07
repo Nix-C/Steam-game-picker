@@ -1,7 +1,7 @@
 /**
  * # Glossary
  * ## Nouns
- * Steam search party; Party - The set of users looking for a common game.
+ * Steam Search Party; Party - The set of users looking for a common game.
  * Leader - The user who started the party.
  * Member - User(s) belonging to a Leader's party.
  * ## Party States
@@ -13,6 +13,11 @@
  * Leave - User will be removed from the party.
  * Begin Search - Leader closes party and searches for a game.
  * Disband - Leader cancles party.
+ */
+
+/**
+ * TODO:
+ * - Add Drizzle ORM
  */
 
 /**
@@ -43,6 +48,8 @@ import {
   verifyKeyMiddleware,
 } from "discord-interactions";
 import { getRandomEmoji, DiscordRequest } from "./utils.js";
+import { UserData } from "./db/userData.js";
+// import { ActiveSessions } from "./db/activeSessions.js";
 
 // Create an express app
 const app = express();
@@ -56,18 +63,9 @@ const __dirname = dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
 // Store for in-progress searches. In production, you'd want to use a DB
+// const test = new ActiveSessions();
 const activeInteractions = {};
 const maxLobbySize = 3;
-
-/**
- * Steam ID 'DB'
- *
- * {
- *    userId: discord_id,
- *    steamId: steam_id
- * }
- */
-const userData = {};
 
 function ephemeralBasic(text) {
   return {
@@ -144,8 +142,14 @@ app.post(
      */
 
     if (type === InteractionType.APPLICATION_COMMAND) {
+      // Connect to userData db
+      const userData = new UserData();
+      const userPermission =
+        (await userData.getUser(user.id)) != undefined ? true : false;
+      userData.close();
+
       // Require user permission
-      if (!userData[user.id]) {
+      if (!userPermission) {
         await res.send(RequestSteamId);
         return;
       }
@@ -154,6 +158,7 @@ app.post(
       if (name === "test") {
         await res.send(RequestSteamId);
       }
+
       if (name === "game-picker" && id) {
         // Init session in "db"
         activeInteractions[id] = {
@@ -224,6 +229,7 @@ app.post(
           }
         );
       }
+
       return;
     }
 
@@ -231,8 +237,12 @@ app.post(
       const { custom_id } = req.body.data;
       const [name, _, interactionId] = custom_id.split("_");
       const partyData = activeInteractions?.[interactionId];
+      const userData = new UserData();
+      const userPermission =
+        (await userData.getUser(user.id)) != undefined ? true : false;
+      userData.close();
 
-      if (!userData[user.id]) {
+      if (!userPermission) {
         await res.send(RequestSteamId);
         return;
       }
@@ -356,6 +366,7 @@ app.post(
             };
 
             // Update message with game data
+            // TODO: DELETE OLD MESSAGE AND UPDATE NEW ONE
             await DiscordRequest(patchEndpoint, {
               method: "PATCH",
               body: {
@@ -453,8 +464,9 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
 
       console.log("Steam ID:", steamConnection.id);
       if (steamConnection.id && discordId) {
-        userData[discordId] = steamConnection.id;
-        console.log(userData);
+        const userData = new UserData();
+        await userData.insertUser(discordId, steamConnection.id);
+        await userData.close();
         res.status(200).redirect("/success.html");
       }
 
@@ -468,3 +480,23 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
 app.listen(PORT, () => {
   console.log("Listening on port", PORT);
 });
+
+// On startup, clean up db's
+const userData = new UserData();
+userData
+  .cleanup()
+  .then(() => {
+    return userData.close();
+  })
+  .catch((err) => console.error(err));
+
+// 24 Hrs: DB Cleanup functions
+setInterval(() => {
+  const userData = new UserData();
+  userData
+    .cleanup()
+    .then(() => {
+      return userData.close();
+    })
+    .catch((err) => console.error(err));
+}, 24 * 60 * 60 * 1000);

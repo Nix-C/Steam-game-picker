@@ -11,7 +11,8 @@
   "scripts": {
     "start": "node app.js",
     "register": "node commands.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "init:UserData": "node db/UserData/initializeUserData.js"
   },
   "author": "Nathaniel Campbell (Nix-C)",
   "license": "MIT",
