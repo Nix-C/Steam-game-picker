@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 // fetch request
-async function getSteamLibrary(steamId, key = STEAM_API_KEY) {
+async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
   const requestOptions = {
     method: "GET",
     redirect: "follow",
@@ -132,7 +132,7 @@ async function findCommonMultiplayerGame(...libs) {
 }
 
 // Return shared game
-async function getSharedGame(userIds) {
+export async function getSharedGame(userIds) {
   console.log("Comparing steam libraries...");
   let libraries = [];
   for (const userId in userIds) {
@@ -156,12 +156,5 @@ async function getSharedGame(userIds) {
     );
   }
 
-  return {};
+  return null;
 }
-
-const sharedGame = await getSharedGame([
-  steamId_1,
-  steamId_2,
-  steamId_3,
-  steamId_4,
-]);

@@ -61,10 +61,30 @@ export class UserData {
     return new Promise((resolve, reject) => {
       this.db.get(sql, [discordId], (err, row) => {
         if (err) {
-          console.error(`Could not retrive row with id ${discordId}`, err);
+          console.error(`Could not retrive row with id ${discordId};`, err);
           reject(err);
         } else {
           resolve(row);
+        }
+      });
+    });
+  }
+
+  async getSteamIds(discordIds) {
+    const placeholders = discordIds.map(() => "?").join(",");
+    const sql = `SELECT steamId FROM ${TABLE_NAME} WHERE id IN (${placeholders})`;
+    return new Promise((resolve, reject) => {
+      this.db.all(sql, discordIds, (err, rows) => {
+        if (err) {
+          console.error(
+            `Could not retrieve steamIds with ids: ${discordIds};`,
+            err
+          );
+          reject(err);
+        } else {
+          const steamIds = rows.map((row) => row.steamId);
+          console.log(steamIds);
+          resolve(steamIds);
         }
       });
     });

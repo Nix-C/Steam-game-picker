@@ -49,6 +49,7 @@ import {
 } from "discord-interactions";
 import { getRandomEmoji, DiscordRequest } from "./utils.js";
 import { UserData } from "./db/userData.js";
+import { getSharedGame } from "./steamGamePicker.js";
 // import { ActiveSessions } from "./db/activeSessions.js";
 
 // Create an express app
@@ -80,6 +81,7 @@ function ephemeralBasic(text) {
 // TODO: Change to res.send with type of UPDATE_MESSAGE
 async function updateOriginalInteraction(req, partyData) {
   const endpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
+  const tags = partyData.userIds.map((userId) => `<@${userId}>`).join(" ");
   try {
     await DiscordRequest(endpoint, {
       method: "PATCH",
@@ -88,7 +90,7 @@ async function updateOriginalInteraction(req, partyData) {
           partyData.userIds[0]
         }> started a game search party! ${getRandomEmoji()}\n\`Members: ${
           partyData.userIds.length
-        }/3\` ${partyData.userIds.forEach((userId) => `<@${userId}>`)}`,
+        }/3\` ${tags}`,
       },
     });
   } catch (err) {
@@ -263,6 +265,7 @@ app.post(
               )
             );
           } else if (name === "leave" && !userExists) {
+            await updateOriginalInteraction(req, partyData);
             return res.send(
               ephemeralBasic(
                 `You aren't in <@${activeInteractions[interactionId].userIds[0]}>'s party.`
@@ -358,26 +361,30 @@ app.post(
             });
 
             // Get game Data
-            const { gameName, storeURL, imgURL } = {
-              gameName: "Old School Runescape",
-              storeURL: "https://store.steampowered.com/app/1343370",
-              imgURL:
-                "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/1343370/6f3b359a68383291bcd2ab49aac079c13c02d8bb.jpg",
-            };
+            // const { gameName, storeURL, imgURL } = {
+            //   gameName: "Old School Runescape",
+            //   storeURL: "https://store.steampowered.com/app/1343370",
+            //   imgURL:
+            //     "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/1343370/6f3b359a68383291bcd2ab49aac079c13c02d8bb.jpg",
+            // };
+            const userData = new UserData();
+            const steamIds = await userData.getSteamIds(partyData.userIds);
+            const { name, appid, img_icon_url } = await getSharedGame(steamIds);
+            userData.close();
 
             // Update message with game data
             // TODO: DELETE OLD MESSAGE AND UPDATE NEW ONE
             await DiscordRequest(patchEndpoint, {
               method: "PATCH",
               body: {
-                content: `<@${partyData.userIds[0]}> found ${gameName}`,
+                content: `<@${partyData.userIds[0]}> found ${name}`,
                 body: {
                   components: [
                     {
                       type: MessageComponentTypes.BUTTON,
                       style: ButtonStyleTypes.LINK,
                       label: "View on Steam",
-                      url: storeURL,
+                      url: `https://store.steampowered.com/app/${appid}`,
                     },
                   ],
                 },
