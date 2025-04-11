@@ -3,32 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>No Steam Connection | Steam Game Picker</title>
+    <link rel="stylesheet" href="app.css" />
   </head>
   <body>
-    <h1>Action Failed - No Steam Connection</h1>
-    <p>Looks like you haven't connected your Steam account!</p>
-    <p>
-      Learn how to connect your Steam account to Discord:
+    <main class="card">
+      <h1>Action Failed - No Steam Connection</h1>
+      <p>Looks like you haven't connected your Steam account!</p>
+      <p>Learn how to connect your Steam account to Discord:</p>
       <ol>
-        <li>Open up the Discord app and next to your username access the cog wheel to open up your User Settings.</li>
+        <li>
+          Open up the Discord app and next to your username access the cog wheel
+          to open up your User Settings.
+        </li>
         <li>Under your User Settings head to Connections.</li>
-        <li>Connect your Steam account by pressing on the Steam tile and then logging into your Steam account.</li>
+        <li>
+          Connect your Steam account by pressing on the Steam tile and then
+          logging into your Steam account.
+        </li>
       </ol>
-    </p>
-    <a id="link" href="">Try Again</a>
+      <div style="padding: 10px; margin: auto">
+        <a id="link" class="button" href="">Try Again</a>
+      </div>
+    </main>
     <script>
       const link = document.getElementById("link");
       const params = new URLSearchParams(location.search);
-      const clientId = params.get("client_id")
+      const clientId = params.get("client_id");
       const domain = location.hostname;
 
-      if(clientId) {
+      if (clientId) {
         link.href = `https://discord.com/oauth2/authorize?client_id=${clientId}&response_type=code&redirect_uri=https%3A%2F%2F${domain}%2Fapi%2Fauth%2Fdiscord%2Fredirect&scope=identify+connections`;
       } else {
         const altText = document.createElement("p");
-        altText.innerHTML = "Please return to Discord to try again."
-        link.insertAdjacentElement("beforebegin", altText)
+        altText.innerHTML = "Please return to Discord to try again.";
+        link.insertAdjacentElement("beforebegin", altText);
         link.remove();
       }
     </script>
