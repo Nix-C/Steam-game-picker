@@ -10,15 +10,16 @@ const axios = setupCache(instance);
 // Axios get request
 async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
   // Check userData for stored game library
-  const userData = new UserData();
-  const steamLibrary = await userData.getSteamLibrary(steamId);
-  await userData.close();
+  // const userData = new UserData();
+  // const steamLibrary = await userData.getSteamLibrary(steamId);
+  // await userData.close();
 
-  if (steamLibrary != null) {
-    console.log("Read libary from local storage!");
+  if (
+    // steamLibrary != null
+    false
+  ) {
     return steamLibrary;
   } else {
-    console.warn("Read library from steam!");
     const requestOptions = {
       method: "GET",
       redirect: "follow",
@@ -43,9 +44,9 @@ async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
       );
       return null;
     }
-    const userData = new UserData();
-    userData.updateSteamLibrary(steamId, response.data.response);
-    userData.close();
+    // const userData = new UserData();
+    // userData.updateSteamLibrary(steamId, response.data.response);
+    // userData.close();
     return response.data.response;
   }
 }
