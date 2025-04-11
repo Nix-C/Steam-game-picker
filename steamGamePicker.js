@@ -1,6 +1,11 @@
 import "dotenv/config";
+import Axios from "axios";
+import { setupCache } from "axios-cache-interceptor";
 
-// fetch request
+const instance = Axios.create();
+const axios = setupCache(instance);
+
+// Axios get request
 async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
   const requestOptions = {
     method: "GET",
@@ -9,9 +14,9 @@ async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
 
   console.log("Fetching Steam library", steamId);
   const request = `http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${key}&include_appinfo=true&include_played_free_games=true&steamid=${steamId}=&format=json`;
-  const response = await fetch(request, requestOptions).catch((error) =>
-    console.error(error)
-  );
+  const response = await axios
+    .get(request, requestOptions)
+    .catch((error) => console.error(error));
 
   try {
     const status = [response.status, response.statusText];
@@ -29,10 +34,7 @@ async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
     return null;
   }
 
-  // Format to return library data only
-  const responseJson = await response.json();
-
-  return responseJson.response;
+  return response.data.response;
 }
 
 // Get game data from pcgamingwiki.com's MediaWikiAPI
@@ -40,11 +42,12 @@ async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
 async function isGameMultiplayer(appId) {
   if (appId) {
     const request = `https://www.pcgamingwiki.com/w/api.php?action=cargoquery&tables=Infobox_game=IG,Multiplayer=M&join_on=IG._pageName=M._pageName&fields=IG._pageName=Page,IG.Steam_AppID,M.Online_players=multiplayer&where=IG.Steam_AppID%20HOLDS%20%22${appId}%22&format=json`;
-    const response = await fetch(request).catch((error) => {
+    const response = await axios.get(request).catch((error) => {
       console.error(error);
     });
 
-    const data = await response.json();
+    console.log(response);
+    const data = response.data;
     const multiplayer = data?.cargoquery[0].title?.multiplayer;
 
     // Add error handling/reporting
@@ -70,9 +73,9 @@ async function isGameMultiplayer_OLD(appId) {
 
   //console.log("Checking if multiplayer...", appId)
   const request = `http://store.steampowered.com/api/appdetails?appids=${appId}`;
-  const response = await fetch(request, requestOptions).catch((error) =>
-    console.error(error)
-  );
+  const response = await axios
+    .get(request, requestOptions)
+    .catch((error) => console.error(error));
 
   try {
     const status = [response.status, response.statusText];
@@ -91,10 +94,10 @@ async function isGameMultiplayer_OLD(appId) {
     return false;
   }
 
-  const response_json = await response.json();
+  const data = response.data.response;
 
-  if (response_json[appId].success == true) {
-    const categories = response_json[appId].data.categories;
+  if (data[appId].success == true) {
+    const categories = data[appId].data.categories;
     try {
       return categories.find((category) => category.id == 1) ? true : false;
     } catch {
@@ -158,3 +161,5 @@ export async function getSharedGame(userIds) {
 
   return null;
 }
+
+console.log(await isGameMultiplayer("493520"));
