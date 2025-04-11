@@ -20,8 +20,6 @@
  * - Delete original message, post steam game picked
  * - Clean up instances (either as cache or db)
  * - Enhance error handling
- * - Cache api calls to steam and PCGamingWiki
- * - prevent party leader from leaving
  */
 
 /**
@@ -480,7 +478,6 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
         });
 
       const discordId = identity_res.data.id;
-      console.log("Discord ID", discordId);
 
       // Request user connections
       const connections_res = await axios
@@ -504,7 +501,14 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
         res.status(200).redirect("/success.html");
       } else {
         // Steam connection doesn't exist
-        res.status(200).redirect("/failure_no-steam-id.html");
+        res.status(200).redirect(
+          url.format({
+            pathname: "/failure_no-steam-id.html",
+            query: {
+              client_id: process.env.CLIENT_ID,
+            },
+          })
+        );
       }
 
       return;
