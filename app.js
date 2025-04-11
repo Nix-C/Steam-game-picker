@@ -279,11 +279,33 @@ app.post(
           const isLeader = partyData.userIds[0] === user.id;
           if (name === "leave" && userExists && isLeader) {
             // Notify user is leader
-            return res.send(
-              ephemeralBasic(
-                "You're the party leader! Did you mean to disband?"
-              )
-            );
+            return res.send({
+              type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+              data: {
+                flags: InteractionResponseFlags.EPHEMERAL,
+                content:
+                  "You're the leader! Did you mean to 'disband'?\n\nLeader Controls:",
+                components: [
+                  {
+                    type: MessageComponentTypes.ACTION_ROW,
+                    components: [
+                      {
+                        type: MessageComponentTypes.BUTTON,
+                        label: "Begin Search",
+                        style: ButtonStyleTypes.SUCCESS,
+                        custom_id: `begin_btn_${interactionId}`,
+                      },
+                      {
+                        type: MessageComponentTypes.BUTTON,
+                        label: "Disband",
+                        style: ButtonStyleTypes.DANGER,
+                        custom_id: `disband_btn_${interactionId}`,
+                      },
+                    ],
+                  },
+                ],
+              },
+            });
           } else if (name === "leave" && userExists && !isLeader) {
             // remove member
             partyData.userIds = partyData.userIds.filter(

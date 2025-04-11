@@ -47,7 +47,6 @@ async function isGameMultiplayer(appId) {
       console.error(error);
     });
 
-    console.log(response);
     const data = response.data;
     const multiplayer = data?.cargoquery[0].title?.multiplayer;
 
@@ -109,6 +108,7 @@ async function isGameMultiplayer_OLD(appId) {
   }
 }
 
+// Compare all libraries for a common game.
 async function findCommonMultiplayerGame(...libs) {
   // Sort the libraries by size (smallest to largest)
   const sorted = libs.sort((a, b) => a.games.length - b.games.length);
