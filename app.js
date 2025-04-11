@@ -17,7 +17,11 @@
 
 /**
  * TODO:
- * - Add Drizzle ORM
+ * - Delete original message, post steam game picked
+ * - Clean up instances (either as cache or db)
+ * - Enhance error handling
+ * - Cache api calls to steam and PCGamingWiki
+ * - prevent party leader from leaving
  */
 
 /**
@@ -66,7 +70,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Store for in-progress searches. In production, you'd want to use a DB
 // const test = new ActiveSessions();
 const activeInteractions = {};
-const maxLobbySize = 3;
+const maxLobbySize = 4;
 
 function ephemeralBasic(text) {
   return {
@@ -78,25 +82,44 @@ function ephemeralBasic(text) {
   };
 }
 
-// TODO: Change to res.send with type of UPDATE_MESSAGE
-async function updateOriginalInteraction(req, partyData) {
-  const endpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
-  const tags = partyData.userIds.map((userId) => `<@${userId}>`).join(" ");
-  try {
-    await DiscordRequest(endpoint, {
-      method: "PATCH",
-      body: {
-        content: `<@${
-          partyData.userIds[0]
-        }> started a game search party! ${getRandomEmoji()}\n\`Members: ${
-          partyData.userIds.length
-        }/3\` ${tags}`,
-      },
-    });
-  } catch (err) {
-    console.error("Error updating message:", err);
-  }
+function updateOriginalInteraction(partyData) {
+  const tags = partyData.userIds.map((userId) => {
+    // Skip first user (that's the Leader!)
+    if (userId != partyData.userIds[0]) {
+      return `<@${userId}>`.join(" ");
+    }
+  });
+  return {
+    type: InteractionResponseType.UPDATE_MESSAGE,
+    data: {
+      content: `<@${
+        partyData.userIds[0]
+      }> started a game search party! ${getRandomEmoji()}\n\`Members: ${
+        partyData.userIds.length
+      }/${maxLobbySize}\` ${tags}`,
+    },
+  };
 }
+
+// TODO: Change to res.send with type of UPDATE_MESSAGE
+// async function updateOriginalInteraction(req, partyData) {
+//   const endpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
+//   const tags = partyData.userIds.map((userId) => `<@${userId}>`).join(" ");
+//   try {
+//     await DiscordRequest(endpoint, {
+//       method: "PATCH",
+//       body: {
+//         content: `<@${
+//           partyData.userIds[0]
+//         }> started a game search party! ${getRandomEmoji()}\n\`Members: ${
+//           partyData.userIds.length
+//         }/${maxLobbySize}\` ${tags}`,
+//       },
+//     });
+//   } catch (err) {
+//     console.error("Error updating message:", err);
+//   }
+// }
 
 const RequestSteamId = {
   type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -174,7 +197,7 @@ app.post(
           data: {
             content: `<@${
               user.id
-            }> started a game search party! ${getRandomEmoji()}\n\`Members: 1/3\``,
+            }> started a game search party! ${getRandomEmoji()}\n\`Members: 1/${maxLobbySize}\``,
             components: [
               {
                 type: MessageComponentTypes.ACTION_ROW,
@@ -253,19 +276,21 @@ app.post(
         // Handle join/leave
         if (name === "join" || name === "leave") {
           const userExists = partyData.userIds.includes(user.id);
-          if (name === "leave" && userExists) {
+          const isLeader = partyData.userIds[0] === user.id;
+          if (name === "leave" && userExists && isLeader) {
+            // Notify user is leader
+            return res.send(
+              ephemeralBasic(
+                "You're the party leader! Did you mean to disband?"
+              )
+            );
+          } else if (name === "leave" && userExists && !isLeader) {
             // remove member
             partyData.userIds = partyData.userIds.filter(
               (userId) => userId !== user.id
             );
-            await updateOriginalInteraction(req, partyData);
-            return res.send(
-              ephemeralBasic(
-                `You've left <@${activeInteractions[interactionId].userIds[0]}>'s party!`
-              )
-            );
+            return res.send(updateOriginalInteraction(partyData));
           } else if (name === "leave" && !userExists) {
-            await updateOriginalInteraction(req, partyData);
             return res.send(
               ephemeralBasic(
                 `You aren't in <@${activeInteractions[interactionId].userIds[0]}>'s party.`
@@ -277,12 +302,7 @@ app.post(
           if (name === "join" && !userExists) {
             if (roomAvailable) {
               partyData.userIds.push(user.id);
-              await updateOriginalInteraction(req, partyData);
-              return res.send(
-                ephemeralBasic(
-                  `You've joined <@${activeInteractions[interactionId].userIds[0]}>'s party!`
-                )
-              );
+              return res.send(updateOriginalInteraction(partyData));
             } else {
               return res.send(
                 ephemeralBasic(
@@ -323,9 +343,7 @@ app.post(
 
               // remove party from db
               delete activeInteractions?.[interactionId];
-
-              // Send user confirmation
-              return res.send(ephemeralBasic(`You canceled the party.`));
+              return;
             } catch (err) {
               console.error("Error disbanding:", err);
               return;
@@ -340,14 +358,6 @@ app.post(
             // Delete controls
             await DiscordRequest(deleteEndpoint, { method: "Delete" });
 
-            // await res.send({
-            //   type: InteractionResponseType.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-            //   data: {
-            //     content: `Searching . . .`,
-            //     components: [],
-            //   },
-            // });
-
             // Send loading message
             const patchEndpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
             await DiscordRequest(patchEndpoint, {
@@ -361,12 +371,6 @@ app.post(
             });
 
             // Get game Data
-            // const { gameName, storeURL, imgURL } = {
-            //   gameName: "Old School Runescape",
-            //   storeURL: "https://store.steampowered.com/app/1343370",
-            //   imgURL:
-            //     "https://cdn.cloudflare.steamstatic.com/steamcommunity/public/images/apps/1343370/6f3b359a68383291bcd2ab49aac079c13c02d8bb.jpg",
-            // };
             const userData = new UserData();
             const steamIds = await userData.getSteamIds(partyData.userIds);
             const { name, appid, img_icon_url } = await getSharedGame(steamIds);
