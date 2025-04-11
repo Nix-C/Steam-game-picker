@@ -70,7 +70,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Store for in-progress searches. In production, you'd want to use a DB
 // const test = new ActiveSessions();
 const activeInteractions = {};
-const maxLobbySize = 4;
+const maxLobbySize = 0;
 
 function ephemeralBasic(text) {
   return {
@@ -103,7 +103,7 @@ function updateOriginalInteraction(partyData) {
 
 // TODO: Change to res.send with type of UPDATE_MESSAGE
 // async function updateOriginalInteraction(req, partyData) {
-//   const endpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
+//   const endpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/@original`;
 //   const tags = partyData.userIds.map((userId) => `<@${userId}>`).join(" ");
 //   try {
 //     await DiscordRequest(endpoint, {
@@ -135,7 +135,7 @@ const RequestSteamId = {
             type: MessageComponentTypes.BUTTON,
             label: "Allow Access",
             style: ButtonStyleTypes.LINK,
-            url: "https://discord.com/oauth2/authorize?client_id=1268350054863998998&response_type=code&redirect_uri=https%3A%2F%2Floving-casual-minnow.ngrok-free.app%2Fapi%2Fauth%2Fdiscord%2Fredirect&scope=identify+connections",
+            url: `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}&response_type=code&redirect_uri=https%3A%2F%2F${process.env.DOMAIN}%2Fapi%2Fauth%2Fdiscord%2Fredirect&scope=identify+connections`,
           },
         ],
       },
@@ -224,7 +224,7 @@ app.post(
         activeInteractions[id].originalMessageToken = response.req.body.token;
 
         await DiscordRequest(
-          `webhooks/${process.env.APP_ID}/${req.body.token}`,
+          `webhooks/${process.env.CLIENT_ID}/${req.body.token}`,
           {
             method: "POST",
             body: {
@@ -319,10 +319,11 @@ app.post(
               )
             );
           }
-          // NOTE: STATEMENT STILL FALL THROUGH, CONSIDER RETURNING INSIDE
+
           const roomAvailable = partyData.userIds.length < maxLobbySize;
           if (name === "join" && !userExists) {
             if (roomAvailable) {
+              // Add party member
               partyData.userIds.push(user.id);
               return res.send(updateOriginalInteraction(partyData));
             } else {
@@ -347,14 +348,14 @@ app.post(
           if (name === "disband" && partyData) {
             try {
               // Delete control message
-              const deleteEndpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/${req.body.message.id}`;
+              const deleteEndpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/${req.body.message.id}`;
               await DiscordRequest(deleteEndpoint, {
                 method: "DELETE",
                 body: {},
               });
 
               // Update interaction message
-              const pathEndpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
+              const pathEndpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/@original`;
               await DiscordRequest(pathEndpoint, {
                 method: "PATCH",
                 body: {
@@ -376,12 +377,12 @@ app.post(
 
           if (name === "begin" && partyData) {
             // Respond to message with body and loading state
-            const deleteEndpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/${req.body.message.id}`;
+            const deleteEndpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/${req.body.message.id}`;
             // Delete controls
             await DiscordRequest(deleteEndpoint, { method: "Delete" });
 
             // Send loading message
-            const patchEndpoint = `webhooks/${process.env.APP_ID}/${partyData.originalMessageToken}/messages/@original`;
+            const patchEndpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/@original`;
             await DiscordRequest(patchEndpoint, {
               method: "PATCH",
               body: {
@@ -449,7 +450,7 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
       client_secret: process.env.CLIENT_SECRET,
       grant_type: "authorization_code",
       code: code.toString(),
-      redirect_uri: `https://loving-casual-minnow.ngrok-free.app/api/auth/discord/redirect`,
+      redirect_uri: `https://${process.env.DOMAIN}/api/auth/discord/redirect`,
     });
 
     // Get access token
@@ -495,12 +496,15 @@ app.get("/api/auth/discord/redirect", async (req, res) => {
         (connection) => connection.type === "steam"
       );
 
-      console.log("Steam ID:", steamConnection.id);
-      if (steamConnection.id && discordId) {
+      if (steamConnection?.id && discordId) {
+        // Successfully got steam connection data
         const userData = new UserData();
         await userData.insertUser(discordId, steamConnection.id);
         await userData.close();
         res.status(200).redirect("/success.html");
+      } else {
+        // Steam connection doesn't exist
+        res.status(200).redirect("/failure_no-steam-id.html");
       }
 
       return;
