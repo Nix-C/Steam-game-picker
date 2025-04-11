@@ -1,3 +1,4 @@
 node_modules
 .env
 NOTES.txt
+db/user_data.db

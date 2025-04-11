@@ -394,8 +394,8 @@ app.post(
             // Get game Data
             const userData = new UserData();
             const steamIds = await userData.getSteamIds(partyData.userIds);
+            await userData.close();
             const { name, appid, img_icon_url } = await getSharedGame(steamIds);
-            userData.close();
 
             // Update message with game data
             // TODO: DELETE OLD MESSAGE AND UPDATE NEW ONE

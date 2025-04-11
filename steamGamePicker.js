@@ -1,5 +1,6 @@
 import "dotenv/config";
 import Axios from "axios";
+import { UserData } from "./db/userData.js";
 import { setupCache } from "axios-cache-interceptor";
 
 // Set up cache interceptor
@@ -8,34 +9,45 @@ const axios = setupCache(instance);
 
 // Axios get request
 async function getSteamLibrary(steamId, key = process.env.STEAM_API_KEY) {
-  const requestOptions = {
-    method: "GET",
-    redirect: "follow",
-  };
+  // Check userData for stored game library
+  const userData = new UserData();
+  const steamLibrary = await userData.getSteamLibrary(steamId);
+  await userData.close();
 
-  console.log("Fetching Steam library", steamId);
-  const request = `http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${key}&include_appinfo=true&include_played_free_games=true&steamid=${steamId}=&format=json`;
-  const response = await axios
-    .get(request, requestOptions)
-    .catch((error) => console.error(error));
+  if (steamLibrary != null) {
+    console.log("Read libary from local storage!");
+    return steamLibrary;
+  } else {
+    console.warn("Read library from steam!");
+    const requestOptions = {
+      method: "GET",
+      redirect: "follow",
+    };
+    const request = `http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=${key}&include_appinfo=true&include_played_free_games=true&steamid=${steamId}=&format=json`;
+    const response = await axios
+      .get(request, requestOptions)
+      .catch((error) => console.error(error));
 
-  try {
-    const status = [response.status, response.statusText];
-    switch (status[0]) {
-      case 200:
-        break; // All clear!
-      default:
-        console.error("Error from Steam API:".status[0], status[1]); // Show the error.
+    try {
+      const status = [response.status, response.statusText];
+      switch (status[0]) {
+        case 200:
+          break; // All clear!
+        default:
+          console.error("Error from Steam API:".status[0], status[1]); // Show the error.
+      }
+    } catch {
+      console.error(
+        "No status code detected. Something may have went wrong.",
+        request
+      );
+      return null;
     }
-  } catch {
-    console.error(
-      "No status code detected. Something may have went wrong.",
-      request
-    );
-    return null;
+    const userData = new UserData();
+    userData.updateSteamLibrary(steamId, response.data.response);
+    userData.close();
+    return response.data.response;
   }
-
-  return response.data.response;
 }
 
 // Get game data from pcgamingwiki.com's MediaWikiAPI
@@ -71,7 +83,6 @@ async function isGameMultiplayer_OLD(appId) {
     redirect: "follow",
   };
 
-  //console.log("Checking if multiplayer...", appId)
   const request = `http://store.steampowered.com/api/appdetails?appids=${appId}`;
   const response = await axios
     .get(request, requestOptions)
@@ -137,14 +148,14 @@ async function findCommonMultiplayerGame(...libs) {
 
 // Return shared game
 export async function getSharedGame(userIds) {
-  console.log("Comparing steam libraries...");
+  console.log("Comparing steam libraries the following ids: ", userIds);
   let libraries = [];
   for (const userId in userIds) {
     const library = await getSteamLibrary(userIds[userId]);
     if (library.games != undefined) {
       libraries.push(library);
     } else {
-      const error = new Error("Could not get games from response.");
+      const error = new Error(`Could not get games from response. ${library}`);
       throw error;
     }
   }

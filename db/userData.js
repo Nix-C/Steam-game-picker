@@ -83,10 +83,37 @@ export class UserData {
           reject(err);
         } else {
           const steamIds = rows.map((row) => row.steamId);
-          console.log(steamIds);
           resolve(steamIds);
         }
       });
+    });
+  }
+
+  async getSteamLibrary(steamId) {
+    const sql = `SELECT steamLibrary FROM ${TABLE_NAME} WHERE steamId = ?`;
+    return new Promise((resolve, reject) => {
+      this.db.get(sql, [steamId], (err, data) => {
+        if (err) {
+          console.error(
+            "Could not retrieve Steam library from " + steamId + ".\n",
+            err
+          );
+          reject(err);
+        } else {
+          const steamLibrary = JSON.parse(data.steamLibrary);
+          resolve(steamLibrary);
+        }
+      });
+    });
+  }
+
+  async updateSteamLibrary(steamId, steamLibrary) {
+    const json = JSON.stringify(steamLibrary);
+    const sql = `UPDATE ${TABLE_NAME} SET steamLibrary = ? WHERE steamId = ?`;
+    this.db.run(sql, [json, steamId], (err, res) => {
+      if (err) {
+        console.error("Error pushing steam library.");
+      }
     });
   }
 
@@ -111,7 +138,8 @@ export class UserData {
     const sql = `CREATE TABLE ${TABLE_NAME} (
       id INTEGER PRIMARY KEY,
       steamId TEXT NOT NULL,
-      expireDate TEXT NOT NULL
+      expireDate TEXT NOT NULL,
+      steamLibrary BLOB NULL
     )`;
     this.db.run(sql, function (err) {
       if (err) {
