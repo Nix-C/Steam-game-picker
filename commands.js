@@ -1,21 +1,5 @@
 import "dotenv/config";
-import { getRPSChoices } from "./game.js";
-import { capitalize, InstallGlobalCommands } from "./utils.js";
-
-// Get the game choices from game.js
-function createCommandChoices() {
-  const choices = getRPSChoices();
-  const commandChoices = [];
-
-  for (let choice of choices) {
-    commandChoices.push({
-      name: capitalize(choice),
-      value: choice.toLowerCase(),
-    });
-  }
-
-  return commandChoices;
-}
+import { InstallGlobalCommands } from "./utils.js";
 
 // // Simple test command
 // const TEST_COMMAND = {
@@ -28,7 +12,7 @@ function createCommandChoices() {
 
 const GAME_PICKER_COMMAND = {
   name: "game-picker",
-  description: "Find a game to play on steam",
+  description: "Find a game to play on Steam",
   type: 1,
   integration_types: [0, 1],
   contexts: [0, 2],
