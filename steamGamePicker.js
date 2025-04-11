@@ -2,6 +2,7 @@ import "dotenv/config";
 import Axios from "axios";
 import { setupCache } from "axios-cache-interceptor";
 
+// Set up cache interceptor
 const instance = Axios.create();
 const axios = setupCache(instance);
 
@@ -161,5 +162,3 @@ export async function getSharedGame(userIds) {
 
   return null;
 }
-
-console.log(await isGameMultiplayer("493520"));

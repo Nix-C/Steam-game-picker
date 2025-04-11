@@ -26,7 +26,7 @@
 
 /**
  * Notes
- * - Interaction Tokens are valid for 15 minutes. Delete after 15 minutes.
+ * - Interaction Tokens are valid for 15 minutes.
  */
 
 /**
