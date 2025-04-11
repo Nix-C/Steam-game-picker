@@ -68,7 +68,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Store for in-progress searches. In production, you'd want to use a DB
 // const test = new ActiveSessions();
 const activeInteractions = {};
-const maxLobbySize = 0;
+const maxLobbySize = 4;
 
 function ephemeralBasic(text) {
   return {
