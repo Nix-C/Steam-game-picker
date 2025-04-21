@@ -18,6 +18,7 @@
 /**
  * TODO:
  * - Delete original message, post steam game picked
+ * - Library expires after 4 hours
  * - Clean up instances (either as cache or db)
  * - Enhance error handling
  */
@@ -80,13 +81,44 @@ function ephemeralBasic(text) {
   };
 }
 
+function gameFoundMessage(partyData, sharedGame) {
+  const { name, appid, img_icon_url } = sharedGame;
+  const imageUrl = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/capsule_231x87.jpg`;
+  const leaderTag = `<@${partyData.userIds[0]}>`;
+  const tags = partyData.userIds
+    .map((userId) => {
+      // Skip first user (that's the Leader!)
+      if (userId != partyData.userIds[0]) {
+        return `<@${userId}>`;
+      }
+    })
+    .join(" ");
+  return {
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: {
+      content: `${leaderTag} found ${name}\n${tags && "Party: " + tags}`,
+      embeds: [
+        {
+          title: name,
+          url: `https://store.steampowered.com/app/${appid}`,
+          image: {
+            url: imageUrl,
+          },
+        },
+      ],
+    },
+  };
+}
+
 function updateOriginalInteraction(partyData) {
-  const tags = partyData.userIds.map((userId) => {
-    // Skip first user (that's the Leader!)
-    if (userId != partyData.userIds[0]) {
-      return `<@${userId}>`.join(" ");
-    }
-  });
+  const tags = partyData.userIds
+    .map((userId) => {
+      // Skip first user (that's the Leader!)
+      if (userId != partyData.userIds[0]) {
+        return `<@${userId}>`;
+      }
+    })
+    .join(" ");
   return {
     type: InteractionResponseType.UPDATE_MESSAGE,
     data: {
@@ -98,26 +130,6 @@ function updateOriginalInteraction(partyData) {
     },
   };
 }
-
-// TODO: Change to res.send with type of UPDATE_MESSAGE
-// async function updateOriginalInteraction(req, partyData) {
-//   const endpoint = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/@original`;
-//   const tags = partyData.userIds.map((userId) => `<@${userId}>`).join(" ");
-//   try {
-//     await DiscordRequest(endpoint, {
-//       method: "PATCH",
-//       body: {
-//         content: `<@${
-//           partyData.userIds[0]
-//         }> started a game search party! ${getRandomEmoji()}\n\`Members: ${
-//           partyData.userIds.length
-//         }/${maxLobbySize}\` ${tags}`,
-//       },
-//     });
-//   } catch (err) {
-//     console.error("Error updating message:", err);
-//   }
-// }
 
 const RequestSteamId = {
   type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -395,31 +407,21 @@ app.post(
             const userData = new UserData();
             const steamIds = await userData.getSteamIds(partyData.userIds);
             await userData.close();
-            const { name, appid, img_icon_url } = await getSharedGame(steamIds);
+            const sharedGame = await getSharedGame(steamIds);
+            const { name, appid, img_icon_url } = sharedGame;
 
             // Update message with game data
             // TODO: DELETE OLD MESSAGE AND UPDATE NEW ONE
-            await DiscordRequest(patchEndpoint, {
-              method: "PATCH",
-              body: {
-                content: `<@${partyData.userIds[0]}> found ${name}`,
-                body: {
-                  components: [
-                    {
-                      type: MessageComponentTypes.BUTTON,
-                      style: ButtonStyleTypes.LINK,
-                      label: "View on Steam",
-                      url: `https://store.steampowered.com/app/${appid}`,
-                    },
-                  ],
-                },
-              },
+            const deleteEndpointOrigin = `webhooks/${process.env.CLIENT_ID}/${partyData.originalMessageToken}/messages/@original`;
+            await DiscordRequest(deleteEndpointOrigin, {
+              method: "DELETE",
+              body: {},
             });
 
             // remove party from db
             delete activeInteractions?.[interactionId];
 
-            return;
+            return res.send(gameFoundMessage(partyData, sharedGame));
           } else if (name === "begin" && !partyData) {
             return res.send(ephemeralBasic(`This party does not exist! 👻`));
           }

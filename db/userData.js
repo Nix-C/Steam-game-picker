@@ -139,7 +139,8 @@ export class UserData {
       id INTEGER PRIMARY KEY,
       steamId TEXT NOT NULL,
       expireDate TEXT NOT NULL,
-      steamLibrary BLOB NULL
+      steamLibrary BLOB NULL,
+      steamLibExpire TEXT NULL
     )`;
     this.db.run(sql, function (err) {
       if (err) {
