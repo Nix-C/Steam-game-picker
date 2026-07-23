@@ -21,11 +21,31 @@
  * - Library expires after 4 hours
  * - Clean up instances (either as cache or db)
  * - Enhance error handling
+ * - Handle expired token
  */
 
 /**
  * Notes
  * - Interaction Tokens are valid for 15 minutes.
+ *  -> Delete interaction messages before then (12 min)
+ */
+
+/**
+ * Error from expired interaction token:
+ 401
+file:///D:/repositories/Discord/Steam%20Game%20Picker%20Project/Steam-game-picker/utils.js:22
+    throw new Error(JSON.stringify(data));
+          ^
+
+Error: {"message":"Invalid Webhook Token","code":50027}
+    at DiscordRequest (file:///D:/repositories/Discord/Steam%20Game%20Picker%20Project/Steam-game-picker/utils.js:22:11)
+    at process.processTicksAndRejections (node:internall/prl/prl/llll/pl/pl/pl/pl/pl/l/pl/pl/ll/ll/ll/prlll/l/l/pl/process/task_queues:95:5)
+l/process/task_queues:95:5)
+l/process/task_queues:95:5)
+l/process/task_queues:95:5)
+    at async file:///D:/repositories/Discord/Steam%20Game%20Picker%20Project/Steam-game-picker/app.js:392:13
+
+Node.js v20.15.0
  */
 
 /**
